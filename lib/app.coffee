@@ -18,15 +18,25 @@ module.exports = (opts) ->
   # disable x-powered-by
   app.disable 'x-powered-by'
 
-  # use morgan write access log
+  # use winston on production
+  morganOpts = {}
   if env is 'production'
     logger = new winston.Logger()
     logger.add(winston.transports.DailyRotateFile, filename: opts.logPath + '/access.log')
     logger.write = (message, encoding) ->
       logger.info(message)
-    app.use morgan('combined', stream: logger)
+    morganOpts =
+      format: 'combined'
+      opts:
+        stream: logger
   else
-    app.use morgan 'dev'
+    morganOpts =
+      format: 'dev'
+      opts: null
+
+  # don't logged with test env
+  # use morgan write access log
+  app.use morgan(morganOpts.format, morganOpts.opts) if env isnt 'test'
 
   # parse json body
   app.use bodyParser.json()
@@ -47,16 +57,16 @@ module.exports = (opts) ->
   # adds a X-Response-Time header to responses
   app.use responseTime()
 
-  # load custom middlewares
-  middlewares = require(opts.middlewarePath)
-  middlewares.forEach (middleware) ->
-    app.use middleware
-
   # init req.data and charset
   app.use (req, res, next) ->
     req.data = {}
     res.charset = 'utf-8'
     next()
+
+  # load custom middlewares
+  middlewares = require(opts.middlewarePath)
+  middlewares.forEach (middleware) ->
+    app.use middleware
 
   # Load controllers
   controllers = glob.sync "#{opts.controllerPath}/**/*.coffee"
@@ -66,7 +76,7 @@ module.exports = (opts) ->
 
   # catch 404 and forward to error handler
   app.use (req, res, next) ->
-    error = new Error 'Resource Not Found'
+    error = new Error 'Resource Not Found.'
     error.name = 'ResourceNotFound'
     error.resource = ''
     error.field = ''
