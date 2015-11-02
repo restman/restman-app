@@ -35,7 +35,6 @@
   "devDependencies": {
     "coffee-script": "1.9.3",
     "mocha": "2.2.5",
-    "should": "7.0.1",
-    "supertest": "1.0.1"
+    "should": "7.0.1"
   }
 }
