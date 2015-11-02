@@ -6,6 +6,7 @@ bodyParser          = require 'body-parser'
 methodOverride      = require 'method-override'
 responseTime        = require 'response-time'
 winston             = require 'winston'
+errors              = require 'restman-errors'
 
 env = process.env.NODE_ENV or 'development'
 
@@ -21,14 +22,14 @@ module.exports = (opts) ->
   # use winston on production
   morganOpts = {}
   if env is 'production'
-    logger = new winston.Logger()
-    logger.add(winston.transports.DailyRotateFile, filename: opts.logPath + '/access.log')
-    logger.write = (message, encoding) ->
-      logger.info(message)
+    accessLogger = new winston.Logger()
+    accessLogger.add(winston.transports.DailyRotateFile, filename: opts.logPath + '/access.log')
+    accessLogger.write = (message, encoding) ->
+      accessLogger.info(message)
     morganOpts =
       format: 'combined'
       opts:
-        stream: logger
+        stream: accessLogger
   else
     morganOpts =
       format: 'dev'
@@ -76,26 +77,25 @@ module.exports = (opts) ->
 
   # catch 404 and forward to error handler
   app.use (req, res, next) ->
-    error = new Error 'Resource Not Found.'
-    error.name = 'ResourceNotFound'
-    error.resource = ''
-    error.field = ''
-    error.statusCode = 404
-    next error
+    next errors.ResourceNotFound()
+
+  errorLoggerOpts =
+    filename: opts.logPath + '/error.log'
+    json: false
+    timestamp: true
+    prettyPrint: true
+
+  errorLogger = new winston.Logger()
+  errorLogger.add winston.transports.DailyRotateFile, errorLoggerOpts
+
+  if env isnt 'production'
+    errorLogger.add winston.transports.Console, errorLoggerOpts
 
   # catch errors handler
   app.use (err, req, res, next) ->
-    status = err.status or err.statusCode or 500
-
-    body =
-      code: err.name
-      message: err.message
-      resource: err.resource
-      field: err.field
-
-    body['error'] = err.stack if env is 'development'
-
-    res.status(status).json(body)
+    return res.status(err.status_code).json(err) if err instanceof errors.RestError
+    errorLogger.info err.stack
+    res.status(500).json(errors.Internal())
 
   # Return app
   app
