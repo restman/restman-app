@@ -30,7 +30,7 @@
     "method-override": "2.3.4",
     "response-time": "2.3.1",
     "winston": "1.0.1",
-    "restman-errors": "^0.0.4"
+    "restman-errors": "0.0.5"
   },
   "devDependencies": {
     "coffee-script": "1.9.3",
